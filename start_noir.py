@@ -79,7 +79,7 @@ def start_proxy(flow_proj):
         "mitmproxy",
         "-w", output_file,
         "-p", "8081",
-        "--set", "stream_large_bodies=0", "&"
+        "--set", "stream_large_bodies=0"
     ]
     print("Записываем трафик...")
     print(flow_proj)
@@ -120,11 +120,11 @@ def check_dir(flow_proj):
         ###START PROXY & NOIR###
         ########################
         mitm_process = start_proxy(flow_proj)
-        print(f"Трафик записан в файл.")
 
         exit_code = start_noir("/opt/noir/bin/noir", selected_dir)
         if exit_code == 0:
             print("Анализ завершён успешно.")
+            print(f"Трафик записан в файл.")
         else:
             print(f"NOIR ERROR: {exit_code}")
         stop_process(mitm_process)
