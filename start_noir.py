@@ -40,7 +40,9 @@ def run_mitm_command(command, working_dir, output_file):
         return False
     
     try:
-        process = subprocess.Popen(command, cwd=working_dir)
+        process = subprocess.Popen(command, cwd=working_dir, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True)
         print(f"mitmproxy запущен в фоне, трафик записывается в {os.path.join(working_dir, output_file)}.")
         return process
     except FileNotFoundError:
@@ -59,9 +61,9 @@ def start_noir(noir_path: str, target_dir: str):
     if not os.path.isdir(target_dir):
         raise NotADirectoryError(f"Указанный каталог не существует: {target_dir}")
     try:
-        result = subprocess.run([noir_path, " -b ", target_dir, " -u ", 
-                                target_domain_name, " --send-proxy http://localhost:8081 ", 
-                                "--format", " json", " --output ", "noir_output.json"], check=False)
+        result = subprocess.run([noir_path, "-b", target_dir, "-u", 
+                                target_domain_name, "--send-proxy",  "http://localhost:8081", 
+                                "--format", "json", "--output", "noir_output.json"], check=False)
         return result.returncode
     except Exception as e:
         raise RuntimeError(f"Ошибка при запуске Noir: {e}")
@@ -72,13 +74,12 @@ def start_proxy(flow_proj):
 
     # Формируем команду для mitmproxy
     record_command = [
-        "mitmproxy",
+        "mitmproxy", "-q",
         "-w", output_file,
         "-p", "8081",
         "--set", "stream_large_bodies=0"
     ]
     print("Записываем трафик...")
-    print(flow_proj, output_file)
     return run_mitm_command(record_command, flow_proj, output_file)
 
 
@@ -125,6 +126,7 @@ def check_dir(flow_proj):
         stop_process(mitm_process)
     except IndexError:
         print("Неправильный номер директории.")
+
 
 
 #
