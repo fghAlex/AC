@@ -33,6 +33,27 @@ import subprocess
 #     except subprocess.CalledProcessError as e:
 #         print(f"Ошибка при выполнении mitmdump: {e}")
 
+def run_mitm_command(command, working_dir):
+
+    # Проверяем, существует ли директория
+    if not os.path.isdir(working_dir):
+        print(f"Ошибка: директория {working_dir} не существует.")
+        return False
+
+    try:
+        # Выполняем команду с указанием рабочей директории
+        subprocess.run(command, cwd=working_dir, check=True)
+        print(f"Команда {command[0]} успешно выполнена в директории {working_dir}.")
+        return True
+    except FileNotFoundError:
+        print(f"Ошибка: команда {command[0]} не найдена. Убедитесь, что она установлена.")
+        return False
+    except subprocess.CalledProcessError as e:
+        print(f"Ошибка при выполнении команды: {e}")
+        return False
+
+
+
 
 def start_noir(noir_path: str, target_dir: str):
     target_domain_name = input("Укажите адрес и порт Объекта Оценки): ")
@@ -53,17 +74,18 @@ def start_noir(noir_path: str, target_dir: str):
 
 
 def start_proxy(selected_dir):
-    # TO DO:
-    output_file = ""
-    
+    output_file = "traffic.flow"
+
     # Формируем команду для mitmproxy
-    command = [
+    record_command = [
         "mitmproxy",
-        "-w", "traffic.flow",
+        "-w", output_file,
         "-p", "8081",
         "--set", "stream_large_bodies=0"
     ]
-    # TO DO:
+    print("Записываем трафик...")
+    run_mitm_command(record_command, selected_dir)
+
     print(f"Трафик записан в файл: {output_file}")
 
 
@@ -82,7 +104,7 @@ def check_dir():
     try:
         choice = int(input("Введите номер директории с исходным кодом ОО: "))
         selected_dir = directories[choice - 1]
-        
+        print(selected_dir)
         ########################
         ###START PROXY & NOIR###
         ########################
@@ -100,3 +122,4 @@ def check_dir():
 #
 # --set stream_large_bodies=0 флаг для оптимизации работы прокси
 #        subprocess.run(["mitmdump -r endpoints.flow --export-curl > requests.sh", selected_dir])
+6+6
