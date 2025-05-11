@@ -1,5 +1,6 @@
 import os
 import subprocess
+import time
 
 ### на случай если захочется редактировать содержимое трафика.
 ### его удобнее редактировать в формате списка curl запросов 
@@ -54,7 +55,7 @@ def run_mitm_command(command, working_dir, output_file):
 
 
 def start_noir(noir_path: str, target_dir: str):
-    target_domain_name = input("Укажите адрес и порт Объекта Оценки): ")
+    target_domain_name = input("Укажите протокол, адрес и порт Объекта Оценки: ")
 
     if not os.path.isfile(noir_path):
         raise FileNotFoundError(f"Noir не найден по пути: {noir_path}")   
@@ -132,8 +133,6 @@ def check_dir(flow_proj):
         else:
             print(f"Файл {output_file} пуст (размер 0 байт). Проверяю снова...")
             time.sleep(check_interval)
-
-
 
 #
 # --set stream_large_bodies=0 флаг для оптимизации работы прокси
