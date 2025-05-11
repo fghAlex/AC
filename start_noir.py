@@ -33,24 +33,20 @@ import subprocess
 #     except subprocess.CalledProcessError as e:
 #         print(f"Ошибка при выполнении mitmdump: {e}")
 
-def run_mitm_command(command, working_dir):
-
+def run_mitm_command(command, working_dir, output_file):
     # Проверяем, существует ли директория
     if not os.path.isdir(working_dir):
         print(f"Ошибка: директория {working_dir} не существует.")
         return False
-
+    
     try:
-        # Выполняем команду с указанием рабочей директории
-        subprocess.run(command, cwd=working_dir, check=True)
-        print(f"Команда {command[0]} успешно выполнена в директории {working_dir}.")
-        return True
+        process = subprocess.Popen(command, cwd=working_dir)
+        print(f"mitmproxy запущен в фоне, трафик записывается в {os.path.join(working_dir, output_file)}.")
+        return process
     except FileNotFoundError:
-        print(f"Ошибка: команда {command[0]} не найдена. Убедитесь, что она установлена.")
-        return False
-    except subprocess.CalledProcessError as e:
-        print(f"Ошибка при выполнении команды: {e}")
-        return False
+        print("Ошибка: mitmproxy не найден. Убедитесь, что он установлен.")
+        return None
+
 
 
 
@@ -82,7 +78,7 @@ def start_proxy(flow_proj):
         "--set", "stream_large_bodies=0"
     ]
     print("Записываем трафик...")
-    print(flow_proj)
+    print(flow_proj, output_file)
     return run_mitm_command(record_command, flow_proj)
 
 
@@ -124,7 +120,6 @@ def check_dir(flow_proj):
         exit_code = start_noir("/opt/noir/bin/noir", selected_dir)
         if exit_code == 0:
             print("Анализ завершён успешно.")
-            print(f"Трафик записан в файл.")
         else:
             print(f"NOIR ERROR: {exit_code}")
         stop_process(mitm_process)
