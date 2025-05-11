@@ -59,11 +59,9 @@ def start_noir(noir_path: str, target_dir: str):
     target_domain_name = input("Укажите адрес и порт Объекта Оценки): ")
 
     if not os.path.isfile(noir_path):
-        raise FileNotFoundError(f"Noir не найден по пути: {noir_path}")
-    
+        raise FileNotFoundError(f"Noir не найден по пути: {noir_path}")   
     if not os.path.isdir(target_dir):
         raise NotADirectoryError(f"Указанный каталог не существует: {target_dir}")
-    
     try:
         result = subprocess.run([noir_path, " -b ", target_dir, " -u ", 
                                 target_domain_name, " --send-proxy http://localhost:8081 ", 
@@ -84,8 +82,21 @@ def start_proxy(flow_proj):
         "--set", "stream_large_bodies=0", "&"
     ]
     print("Записываем трафик...")
-    run_mitm_command(record_command, flow_proj)
-    print(f"Трафик записан в файл: {output_file}")
+    return run_mitm_command(record_command, flow_proj)
+
+
+def stop_process(process):
+    """
+    Завершает процесс mitmproxy.
+
+    :param process: Объект процесса Popen
+    """
+    if process:
+        process.terminate()
+        process.wait()
+        print("mitmproxy остановлен.")
+    else:
+        print("Процесс не был запущен.")
 
 
 def check_dir(flow_proj):
@@ -107,13 +118,15 @@ def check_dir(flow_proj):
         ########################
         ###START PROXY & NOIR###
         ########################
-        start_proxy(flow_proj)
+        mitm_process = start_proxy(flow_proj)
+        print(f"Трафик записан в файл.")
+
         exit_code = start_noir("/opt/noir/bin/noir", selected_dir)
         if exit_code == 0:
             print("Анализ завершён успешно.")
         else:
             print(f"NOIR ERROR: {exit_code}")
-
+        stop_process(mitm_process)
     except IndexError:
         print("Неправильный номер директории.")
 
