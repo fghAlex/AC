@@ -82,6 +82,7 @@ def start_proxy(flow_proj):
         "--set", "stream_large_bodies=0", "&"
     ]
     print("Записываем трафик...")
+    print(flow_proj)
     return run_mitm_command(record_command, flow_proj)
 
 
