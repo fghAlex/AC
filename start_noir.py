@@ -73,7 +73,7 @@ def start_noir(noir_path: str, target_dir: str):
         raise RuntimeError(f"Ошибка при запуске Noir: {e}")
 
 
-def start_proxy(selected_dir):
+def start_proxy(flow_proj):
     output_file = "traffic.flow"
 
     # Формируем команду для mitmproxy
@@ -81,15 +81,14 @@ def start_proxy(selected_dir):
         "mitmproxy",
         "-w", output_file,
         "-p", "8081",
-        "--set", "stream_large_bodies=0"
+        "--set", "stream_large_bodies=0", "&"
     ]
     print("Записываем трафик...")
-    run_mitm_command(record_command, selected_dir)
-
+    run_mitm_command(record_command, flow_proj)
     print(f"Трафик записан в файл: {output_file}")
 
 
-def check_dir():
+def check_dir(flow_proj):
     # Получаем и сортируем список директорий в текущей папке
     directories = sorted([d for d in os.listdir() if os.path.isdir(d)])
 
@@ -108,7 +107,7 @@ def check_dir():
         ########################
         ###START PROXY & NOIR###
         ########################
-        start_proxy(selected_dir)
+        start_proxy(flow_proj)
         exit_code = start_noir("/opt/noir/bin/noir", selected_dir)
         if exit_code == 0:
             print("Анализ завершён успешно.")
@@ -122,4 +121,3 @@ def check_dir():
 #
 # --set stream_large_bodies=0 флаг для оптимизации работы прокси
 #        subprocess.run(["mitmdump -r endpoints.flow --export-curl > requests.sh", selected_dir])
-6+6

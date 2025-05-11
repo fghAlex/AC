@@ -83,7 +83,8 @@ def main():
     ################
     ###NOIR START###
     ################
-    start_noir.check_dir()
+    start_noir.check_dir(flow_proj) # в переменной flow_proj хранится директория с прокетом.
+    print(flow_proj)
     return
 
 if __name__ == '__main__':
