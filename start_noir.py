@@ -55,6 +55,7 @@ def start_noir(noir_path: str, target_dir: str):
 def start_proxy(selected_dir):
     # TO DO:
     output_file = ""
+    
     # Формируем команду для mitmproxy
     command = [
         "mitmproxy",

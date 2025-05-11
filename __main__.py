@@ -39,11 +39,16 @@ def main():
     # список директорий с номерами
     for i, dir in enumerate(directories, 1):
         print(f"{i}. {dir}")
-
+    
     choice = int(input("Введите номер выбранного проекта: "))
     selected_proj = directories[choice - 1]
-    flow_proj = current_dir + "/" + selected_proj
-    subprocess.run("cd", cwd=flow_proj)
+    flow_proj = os.path.join(current_dir, selected_proj)
+
+    try:
+        os.chdir(flow_proj)
+    except FileNotFoundError:
+        print(f"Директория '{flow_proj}' не найдена!")
+        exit(1)
 
     ######################
     ###CONTAINRES START###
