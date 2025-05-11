@@ -69,9 +69,7 @@ def start_noir(noir_path: str, target_dir: str):
         raise RuntimeError(f"Ошибка при запуске Noir: {e}")
 
 
-def start_proxy(flow_proj):
-    output_file = "traffic.flow"
-
+def start_proxy(flow_proj, output_file):
     # Формируем команду для mitmproxy
     record_command = [
         "mitmproxy", "-q",
@@ -109,23 +107,31 @@ def check_dir(flow_proj):
     for i, dir in enumerate(directories, 1):
         print(f"{i}. {dir}")
 
-    try:
-        choice = int(input("Введите номер директории с исходным кодом ОО: "))
-        selected_dir = directories[choice - 1]
-        print(selected_dir)
-        ########################
-        ###START PROXY & NOIR###
-        ########################
-        mitm_process = start_proxy(flow_proj)
+    choice = int(input("Введите номер директории с исходным кодом ОО: "))
+    selected_dir = directories[choice - 1]
+    print(selected_dir)
+    ########################
+    ###START PROXY & NOIR###
+    ########################
+    output_file = "traffic.flow"
+    mitm_process = start_proxy(flow_proj, output_file)
 
-        exit_code = start_noir("/opt/noir/bin/noir", selected_dir)
-        if exit_code == 0:
-            print("Анализ завершён успешно.")
+    exit_code = start_noir("/opt/noir/bin/noir", selected_dir)
+    if exit_code == 0:
+        print("Анализ завершён успешно.")
+    else:
+        print(f"NOIR ERROR: {exit_code}")
+    
+    check_interval = 3
+    while True:
+        size = os.path.getsize(output_file)
+        if size > 0:
+            print(f"Файл {output_file} имеет размер {size} байт. Завершаю ожидание.")
+            stop_process(mitm_process)
+            break
         else:
-            print(f"NOIR ERROR: {exit_code}")
-        stop_process(mitm_process)
-    except IndexError:
-        print("Неправильный номер директории.")
+            print(f"Файл {output_file} пуст (размер 0 байт). Проверяю снова...")
+            time.sleep(check_interval)
 
 
 
