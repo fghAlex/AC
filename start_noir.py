@@ -79,7 +79,7 @@ def start_proxy(flow_proj):
     ]
     print("Записываем трафик...")
     print(flow_proj, output_file)
-    return run_mitm_command(record_command, flow_proj)
+    return run_mitm_command(record_command, flow_proj, output_file)
 
 
 def stop_process(process):
