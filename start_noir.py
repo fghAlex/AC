@@ -1,6 +1,7 @@
 import os
 import subprocess
 import time
+import psutil
 
 ### на случай если захочется редактировать содержимое трафика.
 ### его удобнее редактировать в формате списка curl запросов 
@@ -40,15 +41,42 @@ def run_mitm_command(command, working_dir, output_file):
         print(f"Ошибка: директория {working_dir} не существует.")
         return False
     
+        # try:
+        #     process = subprocess.Popen(command, cwd=working_dir, stdout=subprocess.DEVNULL,
+        #         stderr=subprocess.DEVNULL,
+        #         start_new_session=True)
+        #     print(f"mitmproxy запущен в фоне, трафик записывается в {os.path.join(working_dir, output_file)}.")
+        #     return process
+        # except FileNotFoundError:
+        #     print("Ошибка: mitmproxy не найден. Убедитесь, что он установлен.")
+        #     return None
+    log_file = os.path.join(working_dir, "mitmproxy.log")
+
     try:
-        process = subprocess.Popen(command, cwd=working_dir, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True)
-        print(f"mitmproxy запущен в фоне, трафик записывается в {os.path.join(working_dir, output_file)}.")
+        # Открываем файл для логов
+        with open(log_file, 'w') as log:
+            process = subprocess.Popen(
+                command,
+                cwd=working_dir,
+                stdout=log,
+                stderr=log,
+                start_new_session=True
+            )
+        print(f"mitmproxy запущен в фоне с PID {process.pid}, трафик записывается в {os.path.join(working_dir, flow_file)}.")
+        print(f"Логи сохранены в {log_file}.")
+
+        # Проверяем, что процесс действительно запущен
+        if process.poll() is None:
+            print("Процесс mitmproxy активен.")
+        else:
+            print("Ошибка: процесс mitmproxy завершился сразу после запуска. Проверьте логи.")
+            return None
+
         return process
     except FileNotFoundError:
         print("Ошибка: mitmproxy не найден. Убедитесь, что он установлен.")
         return None
+
 
 
 
