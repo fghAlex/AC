@@ -62,7 +62,7 @@ def run_mitm_command(command, working_dir, output_file):
                 stderr=log,
                 start_new_session=True
             )
-        print(f"mitmproxy запущен в фоне с PID {process.pid}, трафик записывается в {os.path.join(working_dir, flow_file)}.")
+        print(f"mitmproxy запущен в фоне с PID {process.pid}")
         print(f"Логи сохранены в {log_file}.")
 
         # Проверяем, что процесс действительно запущен
@@ -76,10 +76,6 @@ def run_mitm_command(command, working_dir, output_file):
     except FileNotFoundError:
         print("Ошибка: mitmproxy не найден. Убедитесь, что он установлен.")
         return None
-
-
-
-
 
 
 def start_noir(noir_path: str, target_dir: str):
@@ -101,7 +97,7 @@ def start_noir(noir_path: str, target_dir: str):
 def start_proxy(flow_proj, output_file):
     # Формируем команду для mitmproxy
     record_command = [
-        "mitmproxy", "-q",
+        "mitmdump", "-q",
         "-w", output_file,
         "-p", "8081",
         "--set", "stream_large_bodies=0"

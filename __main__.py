@@ -1,7 +1,8 @@
 import os
 import subprocess
 import time
-import start_noir
+import noir_start
+import natch_start
 
 def check_start_containers():
     time.sleep(5)
@@ -54,37 +55,49 @@ def main():
     ###CONTAINRES START###
     ######################
 
-    current_dir = os.getcwd()
-    compose_file = os.path.join(current_dir, 'docker-compose.yml')
+    question = input("Запускать docker-compose? y/N: ")
 
-    # Проверяем, существует ли файл docker-compose.yml
-    if not os.path.isfile(compose_file):
-        print("docker-compose.yml не найден в текущей директории.")
-        exit(1)
-        compose_file = os.path.join(current_dir, 'compose.yml')
+    if question=="y":
+        current_dir = os.getcwd()
+        compose_file = os.path.join(current_dir, 'docker-compose.yml')
+
+        # Проверяем, существует ли файл docker-compose.yml
         if not os.path.isfile(compose_file):
-            print("compose.yml не найден в текущей директории.")
+            print("docker-compose.yml не найден в текущей директории.")
             exit(1)
-    
-    # Запускаем docker-compose up -d
-    print("Запуск контейнеров")
-    try:
-        subprocess.run(['docker-compose', 'up', '-d'], check=True)
-        print("docker-compose up -d выполнено.")
-    except FileNotFoundError:
-        print("Ошибка: docker-compose не найден. Убедитесь, что docker-compose установлен.")
-        exit(1)
-    except subprocess.CalledProcessError as e:
-        print(f"Ошибка при выполнении docker-compose up -d: {e}")
-        exit(1)
+            compose_file = os.path.join(current_dir, 'compose.yml')
+            if not os.path.isfile(compose_file):
+                print("compose.yml не найден в текущей директории.")
+                exit(1)
+        
+        # Запускаем docker-compose up -d
+        print("Запуск контейнеров")
+        try:
+            subprocess.run(['docker-compose', 'up', '-d'], check=True)
+            print("docker-compose up -d выполнено.")
+        except subprocess.CalledProcessError as e:
+            print(f"Ошибка при выполнении docker-compose up -d: {e}")
+            exit(1)
 
-    check_start_containers()
+        check_start_containers()
 
-    ################
-    ###NOIR START###
-    ################
-    start_noir.check_dir(flow_proj) # в переменной flow_proj хранится директория с прокетом.
-    print(flow_proj)
+    ######################
+    ###NOIR+PROXY START###
+    ######################
+    noir_start.check_dir(flow_proj) # в переменной flow_proj хранится директория с прокетом.
+    print(f"Выбран проект: {flow_proj}.")
+
+    #TO DO: Спросить нужно ли экспорт из прокси запросы в curl формат. 
+
+    #################
+    ###NATCH START###
+    #################
+    file_extension = '.qcow2'
+
+    question = input("Запускать Natch? y/N: ")
+    if question=="y":
+        natch_start.start()
+
     return
 
 if __name__ == '__main__':
