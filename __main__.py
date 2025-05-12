@@ -64,7 +64,6 @@ def main():
         # Проверяем, существует ли файл docker-compose.yml
         if not os.path.isfile(compose_file):
             print("docker-compose.yml не найден в текущей директории.")
-            exit(1)
             compose_file = os.path.join(current_dir, 'compose.yml')
             if not os.path.isfile(compose_file):
                 print("compose.yml не найден в текущей директории.")
