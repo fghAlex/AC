@@ -13,13 +13,14 @@ def check_start_containers():
 
     # Проверяем, есть ли контейнеры в выводе (минимум 3 строки: заголовок, разделитель и данные)
     if len(lines) < 3:
+        i=0
         print("Ошибка: контейнеры не найдены.")
         while i < 100:
             time.sleep(10)
 
             output = subprocess.check_output(['docker-compose', 'ps'])
             lines = output.decode().splitlines()
-            i=i+1
+            i += 1
             print(f"Ожидание запуска контейнеров. Выполнено попыток проверки: {i}")
 
             if len(lines) > 3:
@@ -55,7 +56,7 @@ def main():
     ###CONTAINRES START###
     ######################
 
-    question = input("Запускать docker-compose? y/N: ")
+    question = input("Запускать docker-compose? y/N: ").strip().lower()
 
     if question=="y":
         current_dir = os.getcwd()
@@ -86,14 +87,12 @@ def main():
     noir_start.check_dir(flow_proj) # в переменной flow_proj хранится директория с прокетом.
     print(f"Выбран проект: {flow_proj}.")
 
-    #TO DO: Спросить нужно ли экспорт из прокси запросы в curl формат. 
-
     #################
     ###NATCH START###
     #################
     file_extension = '.qcow2'
 
-    question = input("Запускать Natch? y/N: ")
+    question = input("Запускать Natch? y/N: ").strip().lower()
     if question=="y":
         natch_start.start()
 

@@ -3,79 +3,56 @@ import subprocess
 import time
 import psutil
 
-### на случай если захочется редактировать содержимое трафика.
-### его удобнее редактировать в формате списка curl запросов 
-# def send_traffic():
-#     # Формируем путь к файлу endpoints.flow в выбранной директории
-#     flow_file = os.path.join(selected_dir, "endpoints.flow")
-    
-#     # Проверяем, существует ли файл endpoints.flow
-#     if not os.path.isfile(flow_file):
-#         print(f"Ошибка: файл {flow_file} не найден в директории {selected_dir}.")
-#         return
-    
-#     # Формируем команду для mitmdump
-#     command = [
-#         "mitmdump",
-#         "-r", flow_file,
-#         "--set", "stream_large_bodies=0",
-#         "--export-curl"
-#     ]
-    
-#     # Путь к файлу requests.sh в выбранной директории
-#     output_file = os.path.join(selected_dir, "requests.sh")
-    
-#     try:
-#         # Выполняем команду и перенаправляем вывод в requests.sh
-#         with open(output_file, "w") as f:
-#             subprocess.run(command, stdout=f, check=True)
-#         print(f"Команда mitmdump успешно выполнена, результат сохранен в {output_file}.")
-#     except FileNotFoundError:
-#         print("Ошибка: mitmdump не найден. Убедитесь, что mitmproxy установлен.")
-#     except subprocess.CalledProcessError as e:
-#         print(f"Ошибка при выполнении mitmdump: {e}")
 
-def run_mitm_command(command, working_dir, output_file):
-    # Проверяем, существует ли директория
-    if not os.path.isdir(working_dir):
-        print(f"Ошибка: директория {working_dir} не существует.")
-        return False
+def run_mitm_command(working_dir, output_file, docker_command, container_name, volume_path):
+    """
+    Запускает Docker-контейнер с mitmdump в фоновом режиме.
     
-        # try:
-        #     process = subprocess.Popen(command, cwd=working_dir, stdout=subprocess.DEVNULL,
-        #         stderr=subprocess.DEVNULL,
-        #         start_new_session=True)
-        #     print(f"mitmproxy запущен в фоне, трафик записывается в {os.path.join(working_dir, output_file)}.")
-        #     return process
-        # except FileNotFoundError:
-        #     print("Ошибка: mitmproxy не найден. Убедитесь, что он установлен.")
-        #     return None
+    :param working_dir: Путь к директории на хосте для тома и логов
+    :param output_file: Имя файла для записи трафика (внутри тома)
+    :return: ID контейнера или None в случае ошибки
+    """
+
     log_file = os.path.join(working_dir, "mitmproxy.log")
 
     try:
-        # Открываем файл для логов
+        # Запускаем контейнер
         with open(log_file, 'w') as log:
             process = subprocess.Popen(
-                command,
-                cwd=working_dir,
+                docker_command,
                 stdout=log,
                 stderr=log,
-                start_new_session=True
+                text=True
             )
-        print(f"mitmproxy запущен в фоне с PID {process.pid}")
-        print(f"Логи сохранены в {log_file}.")
+        # Ждем, чтобы убедиться, что процесс запустился
+        time.sleep(3)  # Даем время на запуск контейнера
 
-        # Проверяем, что процесс действительно запущен
-        if process.poll() is None:
-            print("Процесс mitmproxy активен.")
+        # Проверяем, что процесс docker run завершился успешно
+        if process.poll() is None or process.returncode == 0:
+            # Получаем ID контейнера
+            container_id = subprocess.check_output(
+                ["docker", "ps", "-q", "-f", f"name={container_name}"],
+                text=True
+            ).strip()
+            if container_id:
+                print(f"Контейнер mitmdump запущен с ID {container_id}, порт 8080, трафик записывается в {os.path.join(volume_path, output_file)}.")
+                print(f"Логи сохранены в {log_file}.")
+                print("Записываем трафик...")
+            else:
+                print("Ошибка: контейнер не найден. Проверьте логи.")
+                return None
         else:
-            print("Ошибка: процесс mitmproxy завершился сразу после запуска. Проверьте логи.")
+            print("Ошибка: команда docker run завершилась с ошибкой. Проверьте логи.")
             return None
 
-        return process
+        return container_id
     except FileNotFoundError:
-        print("Ошибка: mitmproxy не найден. Убедитесь, что он установлен.")
+        print("Ошибка: Docker не найден. Убедитесь, что он установлен.")
         return None
+    except subprocess.CalledProcessError as e:
+        print(f"Ошибка при запуске контейнера: {e}")
+        return None
+
 
 
 def start_noir(noir_path: str, target_dir: str):
@@ -95,29 +72,81 @@ def start_noir(noir_path: str, target_dir: str):
 
 
 def start_proxy(flow_proj, output_file):
-    # Формируем команду для mitmproxy
-    record_command = [
-        "mitmdump", "-q",
-        "-w", output_file,
-        "-p", "8081",
-        "--set", "stream_large_bodies=0"
+
+    # Проверяем, существует ли директория
+    if not os.path.isdir(flow_proj):
+        print(f"Ошибка: директория {flow_proj} не существует.")
+        return None
+
+    container_name = f"mitmdump-{int(time.time())}"  # Уникальное имя контейнера
+    volume_path = os.path.join(flow_proj, "reports")  # Папка для тома
+
+    # Создаем папку для тома, если её нет
+    os.makedirs(volume_path, exist_ok=True)
+
+    docker_command = [
+            "docker", "run", "-d",
+            "--name", container_name,
+            "-p", "8080:8080",
+            "-v", f"{volume_path}:/app/reports",
+            "mitmproxy:1",
+            "mitmdump", "-q", "-w", f"/app/reports/{output_file}", "-p", "8080", "--set", "stream_large_bodies=0"
     ]
-    print("Записываем трафик...")
-    return run_mitm_command(record_command, flow_proj, output_file)
+    return run_mitm_command(flow_proj, output_file, docker_command, container_name, volume_path)
 
+def export_proxy_traffic_to_curl(flow_proj, output_file):
+        
+    # Проверяем, существует ли директория
+    if not os.path.isdir(flow_proj):
+        print(f"Ошибка: директория {flow_proj} не существует.")
+        return None
 
-def stop_process(process):
+    container_name = f"mitmdump-{int(time.time())}"  # Уникальное имя контейнера
+    volume_path = os.path.join(flow_proj, "reports")  # Папка для тома
+
+    # Создаем папку для тома, если её нет
+    os.makedirs(volume_path, exist_ok=True)
+    
+    # Формируем команду docker run
+    docker_command = [
+    "docker", "run", "--rm",
+    "--name", container_name,
+    "-v", f"{volume_path}:/app/reports",
+    "mitmproxy:1",
+    "sh", "-c",
+    "mitmdump -r /app/reports/{output_file} --export-curl > /app/reports/all.sh"
+    ]
+    return run_mitm_command(flow_proj, output_file, docker_command, container_name, volume_path)
+
+def stop_mitm_container(container_id):
     """
-    Завершает процесс mitmproxy.
-
-    :param process: Объект процесса Popen
+    Останавливает и удаляет Docker-контейнер.
+    
+    :param container_id: ID контейнера
     """
-    if process:
-        process.terminate()
-        process.wait()
-        print("mitmproxy остановлен.")
+    if container_id:
+        try:
+            subprocess.run(["docker", "stop", container_id], check=True)
+            subprocess.run(["docker", "rm", container_id], check=True)
+            print(f"Контейнер {container_id} остановлен и удален.")
+        except subprocess.CalledProcessError as e:
+            print(f"Ошибка при остановке контейнера: {e}")
     else:
-        print("Процесс не был запущен.")
+        print("Контейнер не был запущен.")
+
+
+    # #OLD CODE WITHOUT CONTAINER
+    # def stop_process(process):
+    #     """
+    #     Завершает процесс mitmproxy.
+    #     :param process: Объект процесса Popen
+    #     """
+    #     if process:
+    #         process.terminate()
+    #         process.wait()
+    #         print("mitmproxy остановлен.")
+    #     else:
+    #         print("Процесс не был запущен.")
 
 
 def check_dir(flow_proj):
@@ -139,25 +168,31 @@ def check_dir(flow_proj):
     ###START PROXY & NOIR###
     ########################
     output_file = "traffic.flow"
-    mitm_process = start_proxy(flow_proj, output_file)
+    container_id = start_proxy(flow_proj, output_file)
 
     exit_code = start_noir("/opt/noir/bin/noir", selected_dir)
     if exit_code == 0:
         print("Анализ завершён успешно.")
     else:
         print(f"NOIR ERROR: {exit_code}")
-    
-    check_interval = 3
-    while True:
-        size = os.path.getsize(output_file)
-        if size > 0:
-            print(f"Файл {output_file} имеет размер {size} байт. Завершаю ожидание.")
-            stop_process(mitm_process)
-            break
-        else:
-            print(f"Файл {output_file} пуст (размер 0 байт). Проверяю снова...")
-            time.sleep(check_interval)
 
-#
-# --set stream_large_bodies=0 флаг для оптимизации работы прокси
-#        subprocess.run(["mitmdump -r endpoints.flow --export-curl > requests.sh", selected_dir])
+    #TO DO нужна ли еще эта проверка?
+    if container_id:
+        input("Нажмите Enter, чтобы остановить контейнер...")
+        stop_mitm_container(container_id)
+
+    question = input("Экспортировать ли записанный трафик в формате curl? y/N").strip().lower()
+    if question=="y":
+        export_proxy_traffic_to_curl(flow_proj, output_file)
+    return
+    #OLD CODE WITHOUT CONTAINER
+    # check_interval = 3
+    # while True:
+    #     size = os.path.getsize(output_file)
+    #     if size > 0:
+    #         print(f"Файл {output_file} имеет размер {size} байт. Завершаю ожидание.")
+    #         stop_process(mitm_process)
+    #         break
+    #     else:
+    #         print(f"Файл {output_file} пуст (размер 0 байт). Проверяю снова...")
+    #         time.sleep(check_interval)
