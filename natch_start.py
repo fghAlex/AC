@@ -1,6 +1,7 @@
 import os
 import configparser
 import pexpect
+import subprocess
 from subprocess import Popen
 import socket
 import noir_start
@@ -18,7 +19,7 @@ def check_dir(current_directory):
     for file in files_in_directory:
         if file.endswith(file_extension):
             print(f"В {current_directory} найден образ ВМ: {file}")
-            return
+            return files_in_directory
     else:
         print(f"В текущей директории {current_directory} не найден образ ВМ.")
         exit(1)
@@ -57,7 +58,8 @@ def natch_create_config():
     print(f'Файл settings_test.ini успешно создан.')
     return
 
-def natch_create_proj():
+def natch_create_proj(flow_proj, projName, qcow2Path ):
+    subprocess.run(["natch", "create", "-c",  "settings_test.ini", projName, qcow2Path], check=False)
     return
 
 def natch_replay(sample):
@@ -103,8 +105,6 @@ def natch_replay(sample):
     return
 
 def natch_record(sample, flow_proj):
-    # Конфигурационные данные
-    proxy_command = 'sshuttle --dns -r username@remote_host 0.0.0.0/0'  # Команды прокси
 
     
     # Создаем процесс natch с необходимыми аргументами
@@ -131,13 +131,13 @@ def natch_record(sample, flow_proj):
             child.sendline(password)  # Отсылаем пароль
         
         #ожидаем приглашения к выполнению команд
-        child.expect("\$ ")
+        child.expect("\\$ ")
         print("Введите команду запуска ПП:")
 
         while(True):
             command = input()
             child.sendline(command)
-            question = input("Программный продукт запущен? y\N: ").strip().lower()
+            question = input("Программный продукт запущен? y/N: ").strip().lower()
             if question == "y":
                 break
         # Возможно понадобится ещё раз отправить пароль sudo
@@ -152,7 +152,7 @@ def natch_record(sample, flow_proj):
     # Соединяемся с QEMU-монитором
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect(("127.0.0.1", "7799"))
+        sock.connect(("127.0.0.1", 7799))
 
         sock.sendall(b'savevm auto\n')
 
@@ -165,7 +165,7 @@ def natch_record(sample, flow_proj):
     noir_start.start_proxy_for_send_traffic(flow_proj, output_file_noir)
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect(("127.0.0.1", "7799"))
+        sock.connect(("127.0.0.1", 7799))
 
         sock.sendall(b'quit\n')
 
@@ -178,10 +178,11 @@ def natch_record(sample, flow_proj):
 def start(flow_proj):
     
     current_directory = os.getcwd()
-    check_dir(current_directory)
+    files_in_directory = check_dir(current_directory)
     print("Выполняется создание проекта natch.")
     natch_create_config()
-    natch_create_proj()
+    projName = "auto"
+    natch_create_proj(flow_proj, projName, files_in_directory)
     sample = "auto"
     natch_record(sample, flow_proj)
     natch_replay(sample)
