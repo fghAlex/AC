@@ -136,9 +136,9 @@ def export_proxy_traffic_to_curl(flow_proj, output_file):
     "docker", "run", "--rm",
     "--name", container_name,
     "-v", f"{volume_path}:/app/reports",
-    "mitmproxy:1",
-    "sh", "-c",
-    "mitmdump -r /app/reports/{output_file} --export-curl > /app/reports/all.sh"
+    "--entrypoint", "/bin/sh",
+    "mitmproxy/mitmproxy:12",
+    "-c", f"mitmdump -r /app/reports/{output_file} --export-curl > /app/reports/all.sh"
     ]
     return run_mitm_command(flow_proj, output_file, docker_command, container_name, volume_path)
 
