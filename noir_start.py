@@ -1,8 +1,32 @@
 import os
 import subprocess
 import time
-import psutil
 
+def start_proxy_for_send_traffic(flow_proj, output_file):
+    # Проверяем, существует ли директория
+    if not os.path.isdir(flow_proj):
+        print(f"Ошибка: директория {flow_proj} не существует.")
+        return None
+
+    container_name = f"mitmdump-{int(time.time())}"  # Уникальное имя контейнера
+    volume_path = os.path.join(flow_proj, "reports")  # Папка для тома
+
+    # Создаем папку для тома, если её нет
+    os.makedirs(volume_path, exist_ok=True)
+
+    docker_command = [
+    "docker", "run", "--rm",
+    "--name", container_name,
+    "-v", f"{volume_path}:/app/reports",
+    "mitmproxy:1",
+    "mitmdump",
+    "-q",
+    "-r", f"/app/reports/{output_file}",   # читаем из дампа
+    "--mode", "transparent",               # отключает перехват, запросы идут напрямую
+    "--set", "stream_large_bodies=0"
+    ] 
+
+    return run_mitm_command(flow_proj, output_file, docker_command, container_name, volume_path)
 
 def run_mitm_command(working_dir, output_file, docker_command, container_name, volume_path):
     """
@@ -64,7 +88,7 @@ def start_noir(noir_path: str, target_dir: str):
         raise NotADirectoryError(f"Указанный каталог не существует: {target_dir}")
     try:
         result = subprocess.run([noir_path, "-b", target_dir, "-u", 
-                                target_domain_name, "--send-proxy",  "http://localhost:8081", 
+                                target_domain_name, "--send-proxy",  "http://localhost:8080", 
                                 "--format", "json", "--output", "noir_output.json"], check=False)
         return result.returncode
     except Exception as e:
@@ -135,20 +159,6 @@ def stop_mitm_container(container_id):
         print("Контейнер не был запущен.")
 
 
-    # #OLD CODE WITHOUT CONTAINER
-    # def stop_process(process):
-    #     """
-    #     Завершает процесс mitmproxy.
-    #     :param process: Объект процесса Popen
-    #     """
-    #     if process:
-    #         process.terminate()
-    #         process.wait()
-    #         print("mitmproxy остановлен.")
-    #     else:
-    #         print("Процесс не был запущен.")
-
-
 def check_dir(flow_proj):
     # Получаем и сортируем список директорий в текущей папке
     directories = sorted([d for d in os.listdir() if os.path.isdir(d)])
@@ -184,15 +194,5 @@ def check_dir(flow_proj):
     question = input("Экспортировать ли записанный трафик в формате curl? y/N").strip().lower()
     if question=="y":
         export_proxy_traffic_to_curl(flow_proj, output_file)
-    return
-    #OLD CODE WITHOUT CONTAINER
-    # check_interval = 3
-    # while True:
-    #     size = os.path.getsize(output_file)
-    #     if size > 0:
-    #         print(f"Файл {output_file} имеет размер {size} байт. Завершаю ожидание.")
-    #         stop_process(mitm_process)
-    #         break
-    #     else:
-    #         print(f"Файл {output_file} пуст (размер 0 байт). Проверяю снова...")
-    #         time.sleep(check_interval)
+    return 
+

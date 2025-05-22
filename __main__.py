@@ -86,6 +86,7 @@ def main():
     ######################
     noir_start.check_dir(flow_proj) # в переменной flow_proj хранится директория с прокетом.
     print(f"Выбран проект: {flow_proj}.")
+    
 
     #################
     ###NATCH START###
@@ -94,7 +95,7 @@ def main():
 
     question = input("Запускать Natch? y/N: ").strip().lower()
     if question=="y":
-        natch_start.start()
+        natch_start.start(flow_proj)
 
     return
 
