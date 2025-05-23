@@ -19,7 +19,7 @@ def check_dir(current_directory):
     for file in files_in_directory:
         if file.endswith(file_extension):
             print(f"В {current_directory} найден образ ВМ: {file}")
-            return files_in_directory
+            return file
     else:
         print(f"В текущей директории {current_directory} не найден образ ВМ.")
         exit(1)
@@ -62,9 +62,14 @@ def natch_create_proj(flow_proj, projName, qcow2Path ):
     subprocess.run(["natch", "create", "-c",  "settings_test.ini", projName, qcow2Path], check=False)
     return
 
-def natch_replay(sample):
+def natch_replay(sample, projName, choice):
     
-    child = pexpect.spawn(f'natch replay -s "{sample}" -S autosave', timeout=2400)
+    target_path = os.path.join(os.getcwd(), choice, projName)
+
+    child = pexpect.spawn(
+        f'bash -c "cd \\"{target_path}\\" && natch replay -s \\"{sample}\\" -S autosave"',
+        timeout=2400
+    )
     
     try:
         while True:
@@ -104,11 +109,14 @@ def natch_replay(sample):
             print("Нет данных для записи в лог.")
     return
 
-def natch_record(sample, flow_proj):
+def natch_record(sample, flow_proj, projName, choice):
+        
+    target_path = os.path.join(os.getcwd(), choice, projName)
 
-    
-    # Создаем процесс natch с необходимыми аргументами
-    child = pexpect.spawn(f'natch record -s {sample}')
+    child = pexpect.spawn(
+        f'bash -c "cd \\"{target_path}\\" && natch record -s {sample}',
+        timeout=2400
+    )
 
 
     # Обрабатываем диалог входа в систему
@@ -175,7 +183,7 @@ def natch_record(sample, flow_proj):
 
     return
 
-def start(flow_proj):
+def start(flow_proj, choice):
     
     current_directory = os.getcwd()
     files_in_directory = check_dir(current_directory)
@@ -184,7 +192,7 @@ def start(flow_proj):
     projName = "auto"
     natch_create_proj(flow_proj, projName, files_in_directory)
     sample = "auto"
-    natch_record(sample, flow_proj)
-    natch_replay(sample)
+    natch_record(sample, flow_proj, projName, choice)
+    natch_replay(sample, projName, choice)
 
     return
