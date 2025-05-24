@@ -9,32 +9,27 @@ def start_proxy_for_send_traffic(flow_proj, output_file):
         return None
 
     container_name = f"mitmdump-{int(time.time())}"  # Уникальное имя контейнера
-    volume_path = os.path.join(flow_proj, "reports")  # Папка для тома
-
-    # Создаем папку для тома, если её нет
-    os.makedirs(volume_path, exist_ok=True)
 
     docker_command = [
     "docker", "run", "--rm",
     "--name", container_name,
-    "-v", f"{volume_path}:/app/reports",
-    "mitmproxy:1",
+    "-v", "/tmp:/app/reports",
+    "-v", "/usr/local/sbin/AC/script_redirect:/app/scripts/"
+    "mitmproxy/mitmproxy:12",
     "mitmdump",
     "-q",
     "-r", f"/app/reports/{output_file}",   # читаем из дампа
     "--mode", "transparent",               # отключает перехват, запросы идут напрямую
-    "--set", "stream_large_bodies=0"
+    "--set", "stream_large_bodies=0",
+    "-s", "/app/scripts/redirect_port.py"
     ] 
 
-    return run_mitm_command(flow_proj, output_file, docker_command, container_name, volume_path)
+    return run_mitm_command(flow_proj, output_file, docker_command, container_name)
 
-def run_mitm_command(working_dir, output_file, docker_command, container_name, volume_path):
+def run_mitm_command(working_dir, output_file, docker_command, container_name):
     """
     Запускает Docker-контейнер с mitmdump в фоновом режиме.
     
-    :param working_dir: Путь к директории на хосте для тома и логов
-    :param output_file: Имя файла для записи трафика (внутри тома)
-    :return: ID контейнера или None в случае ошибки
     """
 
     log_file = os.path.join(working_dir, "mitmproxy.log")
@@ -59,7 +54,7 @@ def run_mitm_command(working_dir, output_file, docker_command, container_name, v
                 text=True
             ).strip()
             if container_id:
-                print(f"Контейнер mitmdump запущен с ID {container_id}, порт 8080, трафик записывается в {os.path.join(volume_path, output_file)}.")
+                print(f"Контейнер mitmdump запущен с ID {container_id}, порт 8080, трафик записывается в {output_file}.")
                 print(f"Логи сохранены в {log_file}.")
                 print("Записываем трафик...")
             else:
@@ -80,7 +75,7 @@ def run_mitm_command(working_dir, output_file, docker_command, container_name, v
 
 
 def start_noir(noir_path: str, target_dir: str):
-    target_domain_name = input("Укажите протокол, адрес и порт Объекта Оценки: ")
+    target_domain_name = input("Укажите протокол и адрес Объекта Оценки: ")
 
     if not os.path.isfile(noir_path):
         raise FileNotFoundError(f"Noir не найден по пути: {noir_path}")   
@@ -103,20 +98,18 @@ def start_proxy(flow_proj, output_file):
         return None
 
     container_name = f"mitmdump-{int(time.time())}"  # Уникальное имя контейнера
-    volume_path = os.path.join(flow_proj, "reports")  # Папка для тома
-
-    # Создаем папку для тома, если её нет
-    os.makedirs(volume_path, exist_ok=True)
 
     docker_command = [
             "docker", "run", "-d",
             "--name", container_name,
             "-p", "8080:8080",
-            "-v", f"{volume_path}:/app/reports",
-            "mitmproxy:1",
+            "-v", "/tmp:/app/reports",
+            "mitmproxy/mitmproxy:12",
             "mitmdump", "-q", "-w", f"/app/reports/{output_file}", "-p", "8080", "--set", "stream_large_bodies=0"
     ]
-    return run_mitm_command(flow_proj, output_file, docker_command, container_name, volume_path)
+    run_mitm_command(flow_proj, output_file, docker_command, container_name)
+    print(f"container start proxy name:{container_name}")
+    return container_name
 
 def export_proxy_traffic_to_curl(flow_proj, output_file):
         
@@ -140,14 +133,15 @@ def export_proxy_traffic_to_curl(flow_proj, output_file):
     "mitmproxy/mitmproxy:12",
     "-c", f"mitmdump -r /app/reports/{output_file} --export-curl > /app/reports/all.sh"
     ]
-    return run_mitm_command(flow_proj, output_file, docker_command, container_name, volume_path)
+    return run_mitm_command(flow_proj, output_file, docker_command, container_name)
 
 def stop_mitm_container(container_id):
     """
     Останавливает и удаляет Docker-контейнер.
-    
-    :param container_id: ID контейнера
+
     """
+    print(f"container start proxy name:{container_id}")
+
     if container_id:
         try:
             subprocess.run(["docker", "stop", container_id], check=True)
@@ -179,8 +173,9 @@ def check_dir(flow_proj):
     ########################
     output_file = "traffic.flow"
     container_id = start_proxy(flow_proj, output_file)
+    print(f"container start proxy name:{container_id}")
 
-    exit_code = start_noir("/opt/noir/bin/noir", selected_dir)
+    exit_code = start_noir("/usr/local/sbin/noir", selected_dir)
     if exit_code == 0:
         print("Анализ завершён успешно.")
     else:
@@ -191,7 +186,7 @@ def check_dir(flow_proj):
         input("Нажмите Enter, чтобы остановить контейнер...")
         stop_mitm_container(container_id)
 
-    question = input("Экспортировать ли записанный трафик в формате curl? y/N").strip().lower()
+    question = input("Экспортировать ли записанный трафик в формате curl? y/N: ").strip().lower()
     if question=="y":
         export_proxy_traffic_to_curl(flow_proj, output_file)
     return 

@@ -3,9 +3,9 @@ import configparser
 import pexpect
 import subprocess
 from subprocess import Popen
-import socket
+import time
 import noir_start
-
+import sys
 
 def check_dir(current_directory):
 
@@ -64,12 +64,14 @@ def natch_create_proj(flow_proj, projName, qcow2Path ):
 
 def natch_replay(sample, projName, choice):
     
-    target_path = os.path.join(os.getcwd(), choice, projName)
+    target_path = os.path.join(os.getcwd(), projName)
 
     child = pexpect.spawn(
-        f'bash -c "cd \\"{target_path}\\" && natch replay -s \\"{sample}\\" -S autosave"',
+        f'bash -c "cd \"{target_path}\" && natch replay -s \"{sample}\" -S auto"',
         timeout=2400
     )
+
+    child.logfile = sys.stdout.buffer  # Перенаправляем stdout в буфер stdout
     
     try:
         while True:
@@ -111,17 +113,18 @@ def natch_replay(sample, projName, choice):
 
 def natch_record(sample, flow_proj, projName, choice):
         
-    target_path = os.path.join(os.getcwd(), choice, projName)
+    target_path = os.path.join(os.getcwd(), projName)
 
     child = pexpect.spawn(
-        f'bash -c "cd \\"{target_path}\\" && natch record -s {sample}',
+        f'bash -c "cd \"{target_path}\" && natch record -s {sample}',
         timeout=2400
     )
 
+    child.logfile = sys.stdout.buffer  # Перенаправляем stdout в буфер stdout
 
     # Обрабатываем диалог входа в систему
     try:
-        index = child.expect(["login:", "Password:"], timeout=60)
+        index = child.expect(["login:", "Password:"], timeout=2400)
         username = ""
         password = ""
 
@@ -138,48 +141,61 @@ def natch_record(sample, flow_proj, projName, choice):
             password = input("Введите пароль:")
             child.sendline(password)  # Отсылаем пароль
         
-        #ожидаем приглашения к выполнению команд
-        child.expect("\\$ ")
-        print("Введите команду запуска ПП:")
+        # Первая проверка приглашения
+       # child.expect([pexpect.EOF, pexpect.TIMEOUT, "\\$ ", "#", "%"], timeout=300)
 
-        while(True):
-            command = input()
-            child.sendline(command)
-            question = input("Программный продукт запущен? y/N: ").strip().lower()
-            if question == "y":
-                break
-        # Возможно понадобится ещё раз отправить пароль sudo
-        child.expect("$$sudo$$ password for user:")
-        child.sendline(password)  # Повторно посылаем пароль для sudo
+        # Основной цикл для ввода команд
+        #while True:
+         #   print("Введите команду запуска ПП:")
+          #  command = input()
+         #   child.sendline(command)
+         #   question = input("Программный продукт запущен? y/N: ").strip().lower()
+         #   if question == "y":
+         #        break
 
     except pexpect.TIMEOUT as e:
         print("Ошибка ожидания!")
     except Exception as ex:
         print(f"Произошла ошибка: {ex}")
 
-    # Соединяемся с QEMU-монитором
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect(("127.0.0.1", 7799))
+    # Запускаем клиент Telnet
+    mon_child = pexpect.spawn('telnet localhost 7799')
 
-        sock.sendall(b'savevm auto\n')
+    # Получаем идентификатор текущего соединения
+    #tnID = child.ptyproc.pid  # аналогично "$spawn_id" в Tcl
 
-        # Чтение подтверждения от сервера
-        response = sock.recv(1024)
-        print("Полученный ответ:", response.decode())
+    # Ожидаем появления подсказки "(natch)" от QEMU
+    # Запускаем клиент Telnet
+    mon_child.expect('(natch)')
+
+    # Отправляем команду "savevm autosave"
+    mon_child.sendline('savevm auto')
+
+    # Ещё раз ожидаем подсказку "(natch)", чтобы подтвердить успешное сохранение
+    mon_child.expect('(natch)')
+
+    # Выводим итоговый результат
+    print("Состояние после выполнения команды:", mon_child.before.decode())
+
+
+
 
     # Запуск прокси
     output_file_noir = "traffic.flow"
     noir_start.start_proxy_for_send_traffic(flow_proj, output_file_noir)
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect(("127.0.0.1", 7799))
+    time.sleep(5)
 
-        sock.sendall(b'quit\n')
 
-        # Чтение подтверждения от сервера
-        response = sock.recv(1024)
-        print("Полученный ответ:", response.decode())
+    #  Отлючаем ВМ
+    mon_child.sendline('quit')
+
+    # Выводим итоговый результат
+    print("Состояние после выполнения команды:", mon_child.before.decode())
+
+    # Закрываем соединение
+    mon_child.close()
 
     return
 
@@ -190,7 +206,7 @@ def start(flow_proj, choice):
     print("Выполняется создание проекта natch.")
     natch_create_config()
     projName = "auto"
-    natch_create_proj(flow_proj, projName, files_in_directory)
+#    natch_create_proj(flow_proj, projName, files_in_directory)
     sample = "auto"
     natch_record(sample, flow_proj, projName, choice)
     natch_replay(sample, projName, choice)

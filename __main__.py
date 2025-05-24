@@ -95,7 +95,7 @@ def main():
 
     question = input("Запускать Natch? y/N: ").strip().lower()
     if question=="y":
-        natch_start.start(flow_proj, choice)
+        natch_start.start(flow_proj, selected_proj)
 
     return
 
