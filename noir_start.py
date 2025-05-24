@@ -2,36 +2,66 @@ import os
 import subprocess
 import time
 
-def start_proxy_for_send_traffic(flow_proj, output_file):
-    # Проверяем, существует ли директория
-    if not os.path.isdir(flow_proj):
-        print(f"Ошибка: директория {flow_proj} не существует.")
-        return None
+def start_proxy_for_send_traffic(input_file="/tmp/all.sh", log_file="/tmp/curl_execution.log"):
 
-    container_name = f"mitmdump-{int(time.time())}"  # Уникальное имя контейнера
+        # Проверяем, существует ли входной файл
+    if not os.path.isfile(input_file):
+        print(f"Ошибка: файл {input_file} не найден.")
+        return False
 
-    docker_command = [
-    "docker", "run", "--rm",
-    "--name", container_name,
-    "-v", "/tmp:/app/reports",
-    "-v", "/usr/local/sbin/AC/script_redirect:/app/scripts/"
-    "mitmproxy/mitmproxy:12",
-    "mitmdump",
-    "-q",
-    "-r", f"/app/reports/{output_file}",   # читаем из дампа
-    "--mode", "transparent",               # отключает перехват, запросы идут напрямую
-    "--set", "stream_large_bodies=0",
-    "-s", "/app/scripts/redirect_port.py"
-    ] 
+    # Открываем лог-файл для записи
+    try:
+        with open(log_file, 'w') as log:
+            log.write(f"Начало выполнения cURL-команд из {input_file}\n")
+            log.flush()
 
-    return run_mitm_command(flow_proj, output_file, docker_command, container_name)
+            # Читаем файл построчно
+            with open(input_file, 'r') as file:
+                for line_number, line in enumerate(file, 1):
+                    line = line.strip()
+                    # Проверяем, начинается ли строка с 'curl '
+                    if line.startswith('curl '):
+                        log.write(f"\n[Строка {line_number}] Выполняется: {line}\n")
+                        log.flush()
+                        try:
+                            # Выполняем команду cURL
+                            result = subprocess.run(
+                                line,
+                                shell=True,
+                                capture_output=True,
+                                text=True,
+                                timeout=0.1
+                            )
+                            # Записываем результат в лог
+                            log.write(f"Вывод (stdout): {result.stdout}\n")
+                            log.write(f"Ошибки (stderr): {result.stderr}\n")
+                            log.write(f"Код возврата: {result.returncode}\n")
+                            if result.returncode != 0:
+                                print(f"Предупреждение: команда в строке {line_number} завершилась с ошибкой (код {result.returncode})")
+                        except subprocess.TimeoutExpired:
+                            log.write(f"Ошибка: команда в строке {line_number} превысила таймаут\n")
+                            print(f"Ошибка: команда в строке {line_number} превысила таймаут")
+                        except subprocess.SubprocessError as e:
+                            log.write(f"Ошибка выполнения команды в строке {line_number}: {e}\n")
+                            print(f"Ошибка выполнения команды в строке {line_number}: {e}")
+                    else:
+                        log.write(f"[Строка {line_number}] Пропущена (не начинается с 'curl '): {line}\n")
+                        log.flush()
+
+            print(f"Выполнение завершено. Логи сохранены в {log_file}")
+            return True
+
+    except IOError as e:
+        print(f"Ошибка работы с файлами: {e}")
+        return False
+
+    return 
 
 def run_mitm_command(working_dir, output_file, docker_command, container_name):
     """
     Запускает Docker-контейнер с mitmdump в фоновом режиме.
     
     """
-
     log_file = os.path.join(working_dir, "mitmproxy.log")
 
     try:
@@ -121,13 +151,14 @@ def export_proxy_traffic_to_curl(flow_proj, output_file):
     container_name = f"mitmdump-{int(time.time())}"  # Уникальное имя контейнера
     
     # Формируем команду docker run
+    # Формируем команду для экспорта в cURL
     docker_command = [
-    "docker", "run", "--rm",
-    "--name", container_name,
-    "-v", "/tmp:/app/reports",
-    "--entrypoint", "/bin/sh",
-    "mitmproxy/mitmproxy:12",
-    "-c", f"mitmdump -r /app/reports/{output_file} --export-curl > /app/reports/all.sh"
+        "docker", "run", "--rm",
+        "--name", container_name,
+        "-v", f"/tmp:/app/reports",
+        "--entrypoint", "/bin/sh",
+        "mitmproxy/mitmproxy:12",
+        "-c", f"mitmdump -r /app/reports/{output_file} -s /app/reports/curl_export.py > /app/reports/all.sh"
     ]
     return run_mitm_command(flow_proj, output_file, docker_command, container_name)
 
