@@ -119,16 +119,12 @@ def export_proxy_traffic_to_curl(flow_proj, output_file):
         return None
 
     container_name = f"mitmdump-{int(time.time())}"  # Уникальное имя контейнера
-    volume_path = os.path.join(flow_proj, "reports")  # Папка для тома
-
-    # Создаем папку для тома, если её нет
-    os.makedirs(volume_path, exist_ok=True)
     
     # Формируем команду docker run
     docker_command = [
     "docker", "run", "--rm",
     "--name", container_name,
-    "-v", f"{volume_path}:/app/reports",
+    "-v", "/tmp:/app/reports",
     "--entrypoint", "/bin/sh",
     "mitmproxy/mitmproxy:12",
     "-c", f"mitmdump -r /app/reports/{output_file} --export-curl > /app/reports/all.sh"
