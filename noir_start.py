@@ -208,7 +208,6 @@ def check_dir(flow_proj):
     else:
         print(f"NOIR ERROR: {exit_code}")
 
-    #TO DO нужна ли еще эта проверка?
     if container_id:
         input("Нажмите Enter, чтобы остановить контейнер...")
         stop_mitm_container(container_id)

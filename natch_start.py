@@ -121,12 +121,12 @@ def natch_record(sample, flow_proj, projName, choice):
     )
 
     child.logfile = sys.stdout.buffer  # Перенаправляем stdout в буфер stdout
+    index = child.expect(["login:", "Password:"], timeout=2400)
+    username = ""
+    password = ""
 
     # Обрабатываем диалог входа в систему
     try:
-        index = child.expect(["login:", "Password:"], timeout=2400)
-        username = ""
-        password = ""
 
         if index == 0:  # Если увидели prompt "login:"
             username = input("Введите имя пользователя на ВМ:")
@@ -141,22 +141,16 @@ def natch_record(sample, flow_proj, projName, choice):
             password = input("Введите пароль:")
             child.sendline(password)  # Отсылаем пароль
         
-        # Первая проверка приглашения
-       # child.expect([pexpect.EOF, pexpect.TIMEOUT, "\\$ ", "#", "%"], timeout=300)
-
-        # Основной цикл для ввода команд
-        #while True:
-         #   print("Введите команду запуска ПП:")
-          #  command = input()
-         #   child.sendline(command)
-         #   question = input("Программный продукт запущен? y/N: ").strip().lower()
-         #   if question == "y":
-         #        break
-
     except pexpect.TIMEOUT as e:
         print("Ошибка ожидания!")
     except Exception as ex:
         print(f"Произошла ошибка: {ex}")
+
+    #проверка приглашения
+    child.expect([pexpect.EOF, pexpect.TIMEOUT, "\\$ ", "#", "%"], timeout=300)
+
+    print("Введите команду запуска ПП: ")
+    command = input()
 
 
     # Запускаем клиент Telnet
@@ -174,17 +168,14 @@ def natch_record(sample, flow_proj, projName, choice):
 
     # Ещё раз ожидаем подсказку "(natch)", чтобы подтвердить успешное сохранение
     mon_child.expect('(natch)')
-
-    # Выводим итоговый результат
     print("Состояние после выполнения команды:", mon_child.before.decode())
 
-
+    #Отправляем команду запуска ОО
+    child.sendline(command)
 
 
     # Запуск прокси
-    output_file_noir = "traffic.flow"
-    noir_start.start_proxy_for_send_traffic(flow_proj, output_file_noir)
-
+    noir_start.start_proxy_for_send_traffic()
     time.sleep(5)
 
 
